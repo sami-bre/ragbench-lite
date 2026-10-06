@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ragbench-lite report</title>
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 2rem auto; max-width: 900px; color: #1a1a2e; }
+  h1 { font-size: 1.5rem; } .sub { color: #666; margin-bottom: 1.5rem; }
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .card { border: 1px solid #e2e2ea; border-radius: 10px; padding: 1rem 1.4rem; min-width: 160px; }
+  .card .v { font-size: 1.9rem; font-weight: 700; }
+  .card .l { color: #666; font-size: .85rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: 2rem; font-size: .88rem; }
+  th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid #ececf2; vertical-align: top; }
+  th { color: #666; font-weight: 600; }
+  .ok { color: #0a7d33; font-weight: 600; } .miss { color: #c0392b; font-weight: 600; }
+  details { margin-top: .4rem; } summary { cursor: pointer; color: #3b5bdb; }
+  pre { white-space: pre-wrap; background: #f7f7fb; padding: .6rem; border-radius: 6px; }
+</style>
+</head>
+<body>
+<h1>ragbench-lite evaluation report</h1>
+<p class="sub">10 golden questions &middot; BM25 top-5 retrieval &middot;
+answer model <code>openrouter/google/gemini-3-flash-preview</code> &middot; judge <code>openrouter/google/gemini-3-flash-preview</code></p>
+<div class="cards">
+  <div class="card"><div class="v">90%</div><div class="l">recall@5</div></div>
+  <div class="card"><div class="v">1.00</div><div class="l">faithfulness (LLM judge)</div></div>
+  <div class="card"><div class="v">0.95</div><div class="l">answer relevance (LLM judge)</div></div>
+</div>
+<table>
+<tr><th>Question</th><th>Recall</th><th>Faith.</th><th>Relev.</th><th></th></tr>
+
+<tr>
+  <td>How are Agent restore points captured and restored, and why tar jobs instead of CSI snapshots?</td>
+  <td><span class="ok">hit</span><br>
+      <small>runtime-and-deployment.md, CHANGELOG.md, INDEX.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>Agent restore points are captured by running a Kubernetes Job that archives an Agent's persistent volume onto a per-restore-point PVC. This mechanism is used instead of CSI `VolumeSnapshot` or PVC `dataSource` cloning because the default `local-path` storage class used in k3s and k3d supports neither. Using tar jobs ensures the design works across every storage class, including local development environments. Additionally, tar jobs allow for the deliberate exclusion of credential material and files regenerated on boot, which a byte-exact CSI snapshot could not distinguish.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately reflects all claims made in the context regarding the use of Kubernetes Jobs for restore points and the reasons for avoiding CSI snapshots.</small></p><p><small><b>relevance:</b> The answer covers all key points of the reference while providing additional accurate technical context regarding storage class compatibility and exclusion sets.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How does the transactional domain-event outbox work?</td>
+  <td><span class="ok">hit</span><br>
+      <small>CHANGELOG.md, 2026-07-25-transactional-domain-event-outbox.md, domain-events.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>The transactional domain-event outbox persists internal Domain Events using a PostgreSQL database to ensure atomicity between business mutations and event intent. When a domain-specific repository operation produces an event, it writes the business state, one Outbox Message, and one Event Delivery for each registered handler using a single SQLModel session and commit. This approach keeps the domain code transport-neutral before introducing Dramatiq/Redis delivery. By avoiding separate sessions or worker-based delivery row creation, PostgreSQL serves as the durable source for both publication and handler-delivery state.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately summarizes the transactional outbox mechanism, its components, and its purpose as described in the context.</small></p><p><small><b>relevance:</b> The answer correctly identifies the core mechanism of writing events to a database table within the same transaction as the state change to ensure atomicity, while providing additional implementation details.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>Why are organization roles and agent access roles separate?</td>
+  <td><span class="ok">hit</span><br>
+      <small>2026-07-18-permission-backed-organization-roles.md, 2026-07-18-assigned-agent-access-boundary.md, INDEX.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>Organization roles and agent access roles are separated to decouple resource visibility from organization-level permissions. This separation allows ordinary members to see and act only on specific Agents assigned to their membership, rather than all organization-owned resources. Additionally, authorizing named permissions instead of role names avoids coupling every authorization site to a fixed enum, facilitating the future introduction of organization-defined roles. This structure also ensures that Agent creation grants immutable provenance and explicit access that is not erased by subsequent organization-level role changes.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately reflects the context's points regarding the separation of roles, the use of named permissions for future flexibility, and the handling of agent creator provenance.</small></p><p><small><b>relevance:</b> The answer correctly identifies that the separation decouples organization-level permissions from specific agent visibility and allows for independent assignment, covering all key points of the reference answer with additional detail.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How does cost tracking and spend attribution work for organizations and agents?</td>
+  <td><span class="ok">hit</span><br>
+      <small>INDEX.md, AF-281-cost-tracking-findings.md, costs.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>Cost tracking is managed through the `cost_record` table, a cost sync/healing CronJob, and specific spend limits for Organizations and Agents. Spend attribution is derived from provider-reported costs rather than a local price map, as the system relies on the provider as the source of truth. All cost history survives agent deletion, as cost rows do not cascade and the platform must render spend for non-existent agents. Current limitations include a lack of per-user or per-conversation attribution and the inability to track cache-read token costs. Infrastructure costs are explicitly excluded from the tracking scope.</pre>
+      <p><small><b>faithfulness:</b> All claims in the answer, including the management mechanisms, data retention policies, and specific limitations, are directly supported by the provided context.</small></p><p><small><b>relevance:</b> The answer covers all key points from the reference, including per-agent ingestion, the CronJob reconciliation, and organization spend limits, while providing additional accurate technical context.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How do Agent Webhooks deliver signed machine triggers?</td>
+  <td><span class="ok">hit</span><br>
+      <small>INDEX.md, system-map.md, agent-webhooks.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>Agent Webhooks deliver signed machine triggers through an authenticated HTTP ingress at `/agent-hooks/v1/{webhook_id}`. The Agent Webhooks domain manages admission, caller idempotency, and durable invocation history. Once admitted, the system performs a native job submission to a runtime (Hermes or OpenClaw), which executes the resulting one-shot Agent Trigger Job. Delivery to the agent occurs through a runtime-owned Communication Connection. These webhooks are agent-subordinate resources that remain separate from Platform or Communication Connections.</pre>
+      <p><small><b>faithfulness:</b> Every claim in the answer, including the specific ingress path, domain responsibilities, and the relationship between webhooks and connections, is directly supported by the provided context.</small></p><p><small><b>relevance:</b> The answer covers all key points of the reference, including signed HTTP triggers, job submission, and decoupling from the communications platform, while providing additional technical detail.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>What is the runtime configuration digest used for agent update prompts?</td>
+  <td><span class="ok">hit</span><br>
+      <small>agents.md, runtime-and-deployment.md, CHANGELOG.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>The `running_config_digest` is a record of the platform-authored code and runtime images a specific Agent's pod was built from. It is derived from the static closure of the Agent assembly code plus the runtime image references. The system compares this recorded digest against what the API would currently build to determine if an update is available. When these values differ, `AgentRead.update_available` becomes true, triggering an advisory update signal. This signal is purely advisory, blocks no operations, and clears once the Agent is restarted. It specifically excludes the Agent's own configuration, such as `pending_model` or Skill-level updates.</pre>
+      <p><small><b>faithfulness:</b> Every claim in the answer is directly supported by the provided context, including the definition of the digest, its derivation, the comparison logic, and its advisory nature.</small></p><p><small><b>relevance:</b> The answer provides a highly detailed and accurate explanation that covers all key points of the reference answer, including the comparison mechanism and the update_available flag.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How do organization templates move from draft to published?</td>
+  <td><span class="ok">hit</span><br>
+      <small>templates-and-skills.md, templates-and-skills.md, 2026-09-04-organization-templates-use-draft-publish.md</small></td>
+  <td>1.00</td>
+  <td>1.00</td>
+  <td><details><summary>answer</summary>
+      <pre>Organization templates move from draft to published through an explicit publishing action, which creates the next immutable version of the template. This process adopts the Platform Template model, where a single mutable draft exists in `agent_template_draft` for each lineage. Content changes are draft-gated, and the previous `PATCH` method that created a version on every save has been removed. Once published, the new version is immutable and does not mutate the lineage's history.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately reflects the transition from version-per-save to a draft-publish model where publishing creates an immutable version, as described in the context.</small></p><p><small><b>relevance:</b> The answer covers all key points of the draft/publish lifecycle, including the creation of immutable versions and the transition from mutable drafts, while providing additional technical context.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How do required skill versions constrain agent configuration?</td>
+  <td><span class="miss">MISS</span><br>
+      <small>INDEX.md, CHANGELOG.md, CHANGELOG.md</small></td>
+  <td>1.00</td>
+  <td>0.90</td>
+  <td><details><summary>answer</summary>
+      <pre>Required skill versions constrain agent configuration by enforcing exact version matches during the `select_agent_template` process. While Override drafts and published versions only validate the presence, visibility, and provider requirements of a skill, the exact version pin is not activated until selection. An agent cannot be selected if its current pins do not match the required skill versions specified in the configuration. Additionally, skill assignments pin explicit versions at apply time, and publishing a newer skill version does not automatically update an existing pin. Recovery from a bad skill version requires manually re-pinning the agent to an older version.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately reflects the context regarding skill version enforcement during selection, the validation rules for drafts, and the manual re-pinning process for skill versions.</small></p><p><small><b>relevance:</b> The answer correctly identifies that agent selection enforces version requirements and mentions the specific selection process, though it omits the specific UI sections mentioned in the reference.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>What does the platform Event Delivery Monitor track?</td>
+  <td><span class="ok">hit</span><br>
+      <small>domain-events.md, domain-events.md, domain-events.md</small></td>
+  <td>1.00</td>
+  <td>0.70</td>
+  <td><details><summary>answer</summary>
+      <pre>The Platform Event Delivery Monitor tracks **Event Deliveries**, specifically monitoring the health of the Event Delivery pipeline. It does not track Outbox Messages, as these represent immutable publication intent without a lifecycle status. The monitor tracks the `PENDING → ENQUEUED → PROCESSING → SUCCEEDED | DEAD_LETTERED` lifecycle of mutable delivery rows. Additionally, it surfaces curated Actor/Subject display strings when included in the event payload. The tool is strictly read-only and intended for Platform Administrators to inspect global delivery health.</pre>
+      <p><small><b>faithfulness:</b> Every claim in the answer, including the specific lifecycle states and the distinction between Event Deliveries and Outbox Messages, is directly supported by the provided context.</small></p><p><small><b>relevance:</b> The answer correctly identifies event deliveries and their lifecycle but explicitly contradicts the reference by stating it does not track outbox messages.</small></p>
+  </details></td>
+</tr>
+
+<tr>
+  <td>How does interactive command approval work for agents?</td>
+  <td><span class="ok">hit</span><br>
+      <small>INDEX.md, runtime-and-deployment.md, CHANGELOG.md</small></td>
+  <td>1.00</td>
+  <td>0.90</td>
+  <td><details><summary>answer</summary>
+      <pre>Interactive command approval is currently limited to Hermes-only agents, as OpenClaw agents do not yet have user-configurable controls and default to `AUTO`. The system maps the `approval_mode` field to the runtime's approval policy, pinning settings like `timeout` and `cron_mode` to prevent silent policy shifts during upgrades. Headless or cron-driven runs default to a `deny` policy, refusing dangerous commands immediately since no human is present. The exception is `BOOT.md` runs, which the runtime treats as interactive sessions, causing flagged commands to park until the timeout expires. For supported agents, the delivery state involves the runtime adapter, Web Chat, and specific platform slices.</pre>
+      <p><small><b>faithfulness:</b> The answer accurately reflects the context regarding Hermes-only support, the pinning of approval settings, the handling of headless/BOOT.md runs, and the delivery state components.</small></p><p><small><b>relevance:</b> The answer covers the same key points as the reference, including the role of the runtime adapter and Web Chat, while providing additional technical context about specific agent types and policies.</small></p>
+  </details></td>
+</tr>
+
+</table>
+</body>
+</html>
